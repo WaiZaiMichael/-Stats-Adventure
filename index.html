@@ -37,7 +37,9 @@
                     <div id="inputSection" style="display: none;">
                         <div class="p-3 mb-3 bg-light rounded text-start border">
                             <div class="mb-2">📢 <b>本輪情報：</b></div>
-                            <div class="mb-2">當前 $a$ 值：<span id="roundAValue" class="badge bg-danger fs-6">0.8</span></div>
+                            
+                            <div id="aValueRow" class="mb-2" style="display: none;">當前 $a$ 值：<span id="roundAValue" class="badge bg-danger fs-6">0.8</span></div>
+                            
                             <div class="small text-secondary mb-1"><b>💡 本輪免扣分指標（只要最接近任一啟用的指標即可）：</b></div>
                             <div id="activeConditionsZone">
                                 </div>
@@ -110,7 +112,6 @@
     }
 
     function listenToGameStatus() {
-        // 監聽自己的分數與生死狀態
         db.ref(`game/players/${myName}`).on('value', (snapshot) => {
             let data = snapshot.val();
             if (data) {
@@ -125,16 +126,22 @@
         db.ref('game/rules').on('value', (snapshot) => {
             let rules = snapshot.val();
             if(rules) {
-                // 1. 更新 a 值顯示
-                document.getElementById('roundAValue').innerText = rules.a;
-                
-                // 2. 動態生成當前被勾選的條件標籤
                 let zone = document.getElementById('activeConditionsZone');
+                let aValueRow = document.getElementById('aValueRow');
                 zone.innerHTML = ""; // 先清空舊的
 
+                // 🔄 修改重點：判斷 Mean 是否被啟用
                 if (rules.mean) {
+                    // 如果啟用了 Mean 条件，才顯示 a 值行，並新增標籤
+                    aValueRow.style.display = 'block';
+                    document.getElementById('roundAValue').innerText = rules.a;
                     zone.innerHTML += `<span class="condition-badge bg-primary text-white">🎯 平均數(Mean) × ${rules.a}</span>`;
+                } else {
+                    // 如果沒有啟用 Mean 條件，直接將 a 值行隱藏
+                    aValueRow.style.display = 'none';
                 }
+                
+                // 處理其他指標
                 if (rules.median) {
                     zone.innerHTML += `<span class="condition-badge bg-success text-white">🎯 中位數(Median)</span>`;
                 }
@@ -148,14 +155,12 @@
                     zone.innerHTML += `<span class="condition-badge bg-secondary text-white">🎯 全距/範圍(Range)</span>`;
                 }
 
-                // 防呆：如果主持人都沒勾選任何條件
                 if(zone.innerHTML === "") {
                     zone.innerHTML = `<span class="text-danger small">⚠️ 老師目前沒有勾選任何獲勝指標！</span>`;
                 }
             }
         });
 
-        // 監聽回合進行狀態
         db.ref('game/status').on('value', (snapshot) => {
             let status = snapshot.val();
             let info = document.getElementById('statusInfo');
@@ -172,7 +177,6 @@
             } else if (status === 'CALCULATING') {
                 info.className = "alert alert-info fw-bold my-3";
                 info.innerText = "⏳ 截止！老師正在進行統計學計算並繪製箱形圖...";
-                inputSec.style.with = 'block';
                 inputSec.style.display = 'none';
             } else if (status === 'FINISHED') {
                 info.className = "alert alert-dark fw-bold my-3";
