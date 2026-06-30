@@ -53,7 +53,7 @@
             <div class="player-card">
                 <h5 class="fw-bold text-secondary">📖 遊戲玩法簡介</h5>
                 <div class="rule-text">
-                    遊戲開始時，所有玩家的起始生命值為 <strong>8 </strong>。<br>
+                    遊戲開始時，所有玩家的起始生命值為 <strong>8 分</strong>。<br>
                     每回合開始後，玩家需要在 60 秒內，從 0-100 中選擇一個整數並提交。若時限已到但沒有提交數字，則預設該玩家提交數字 0。<br><br>
                     回合結算後，如果玩家所提交的數字最接近：<br>
                     1）平均數 x 0.7 至 1.3 後的數值<br>
@@ -70,7 +70,6 @@
 </div>
 
 <script>
-    // 🔴 請在這裡貼上與 Host 完全一樣的 Firebase Config 數據！
     const firebaseConfig = {
         apiKey: "AIzaSyC6r7C3CAN8QnLH7qCRy3gnBIRTPMEWNPM",
         authDomain: "alice-borderland-k.firebaseapp.com",
@@ -80,7 +79,7 @@
         messagingSenderId: "483900403059",
         appId: "1:483900403059:web:9efab015e2a6478e542906",
         measurementId: "G-RLFKHK4L4X"
-        };
+    };
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
@@ -91,26 +90,31 @@
         myName = document.getElementById('playerName').value.trim();
         if (!myName) { alert("請輸入名字！"); return; }
 
-        db.ref(`game/players/${myName}`).once('value', (snapshot) => {
-            if (snapshot.exists()) {
-                // 如果已經存在，直接加進去監聽
-                document.getElementById('loginArea').style.display = 'none';
-                document.getElementById('gameArea').style.display = 'block';
-                document.getElementById('welcomeMsg').innerText = `參賽同學：${myName}`;
-                listenToGameStatus();
+        db.ref(`game/players/${myName}`).once('value').then((snapshot) => {
+            if (snapshot.exists() && snapshot.val().score !== undefined) {
+                // 如果玩家已存在且有生命值數據，直接進入
+                proceedToGameZone();
             } else {
-                // 如果是新玩家，明確初始化 8 點生命值
+                // 新玩家或異常殘留數據，明確初始化 8 點生命值
                 db.ref(`game/players/${myName}`).set({
                     score: 8,
                     currentMove: ""
                 }).then(() => {
-                    document.getElementById('loginArea').style.display = 'none';
-                    document.getElementById('gameArea').style.display = 'block';
-                    document.getElementById('welcomeMsg').innerText = `參賽同學：${myName}`;
-                    listenToGameStatus();
+                    proceedToGameZone();
+                }).catch((error) => {
+                    alert("連線資料庫失敗，請檢查網路！" + error.message);
                 });
             }
+        }).catch((err) => {
+            alert("讀取資料庫失敗：" + err.message);
         });
+    }
+
+    function proceedToGameZone() {
+        document.getElementById('loginArea').style.display = 'none';
+        document.getElementById('gameArea').style.display = 'block';
+        document.getElementById('welcomeMsg').innerText = `參賽同學：${myName}`;
+        listenToGameStatus();
     }
 
     function listenToGameStatus() {
@@ -118,14 +122,13 @@
         db.ref(`game/players/${myName}`).on('value', (snapshot) => {
             let data = snapshot.val();
             
-            // 🔄 修正重點：必須確保 data 存在，且 score 欄位明確有數值，才做判定
+            // 💡 嚴格防空判定
             if (data && data.score !== undefined && data.score !== null) {
                 let currentScore = parseInt(data.score);
                 
                 let scoreBadge = document.getElementById('myScoreDisplay');
                 if (scoreBadge) {
                     scoreBadge.innerText = `生命值：${currentScore} / 8`;
-                    
                     if (currentScore <= 3) {
                         scoreBadge.className = "fs-5 my-2 badge bg-danger"; 
                     } else {
@@ -133,7 +136,7 @@
                     }
                 }
 
-                // 只有當確定生命值真的小於或等於 0 時，才顯示淘汰畫面
+                // 只有生命值確實小於或等於 0 時才觸發淘汰畫面
                 if (currentScore <= 0) {
                     document.getElementById('mainPlayerCard').innerHTML = `
                         <h3 class="fw-bold text-danger">📐 統計大冒險 🎲</h3>
@@ -162,18 +165,10 @@
                     aValueRow.style.display = 'none';
                 }
                 
-                if (rules.median) {
-                    zone.innerHTML += `<span class="condition-badge bg-success text-white">🎯 中位數(Median)</span>`;
-                }
-                if (rules.lq) {
-                    zone.innerHTML += `<span class="condition-badge bg-info text-dark">🎯 下四分位數(LQ)</span>`;
-                }
-                if (rules.uq) {
-                    zone.innerHTML += `<span class="condition-badge bg-warning text-dark">🎯 上四分位數(UQ)</span>`;
-                }
-                if (rules.range) {
-                    zone.innerHTML += `<span class="condition-badge bg-secondary text-white">🎯 全距/範圍(Range)</span>`;
-                }
+                if (rules.median) zone.innerHTML += `<span class="condition-badge bg-success text-white">🎯 中位數(Median)</span>`;
+                if (rules.lq) zone.innerHTML += `<span class="condition-badge bg-info text-dark">🎯 下四分位數(LQ)</span>`;
+                if (rules.uq) zone.innerHTML += `<span class="condition-badge bg-warning text-dark">🎯 上四分位數(UQ)</span>`;
+                if (rules.range) zone.innerHTML += `<span class="condition-badge bg-secondary text-white">🎯 全距/範圍(Range)</span>`;
 
                 if(zone.innerHTML === "") {
                     zone.innerHTML = `<span class="text-danger small">⚠️ 老師目前沒有勾選任何獲勝指標！</span>`;
